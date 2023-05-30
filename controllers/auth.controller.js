@@ -1,52 +1,32 @@
 const User = require("../model/user");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const generateCookieToken = require("../utils/generateCookieToken");
 
-exports.signup = async (req, res) => {
+exports.signup = async (req, res, next) => {
     try {
-        const { firstname, lastname, email, password } = req.body;
+      const {username, email, password} = req.body;
     
-        if (!(email && password && firstname && lastname)) {
-          throw new Error("All fields are required");
-        }
-    
-        if (!(typeof email === "string" && typeof password === "string" && typeof firstname === "string" && typeof lastname === "string")) {
-          throw new Error("Should be in string format");
-        }
-    
-        const existingUser = await User.findOne({ email });
-    
-        if (existingUser) {
-          throw new Error("User already exists!");
-        }
-    
-        const myEncPassword = await bcrypt.hash(password, 10);
-    
-        const user = await User.create({
-          firstname,
-          lastname,
-          email: email.toLowerCase(),
-          password: myEncPassword,
-        });
-    
-        const token = jwt.sign(
-          {
-            user_id: user._id,
-            email,
-          },
-          process.env.SECRET_KEY,
-          {
-            expiresIn: "2h",
-          }
-        );
-    
-        user.token = token;
-    
-        res.status(201).json({
-          success: true,
-          message: 'Sign Up Successfully!',
-          userDetails: user,
-        });
+
+      if(!username || !email || !password){
+          return next(new Error("username, email and password are required!"))
+      }
+  
+      //Take out the user info from the database...
+      const isExistedUser = await User.findOne({ email: email })
+      
+      if (isExistedUser) {
+          throw new Error("User already Exists! SignIn instead of SignUp!");
+      }
+  
+      const user = await User.create({
+          username,
+          email,
+          password
+      });
+  
+      generateCookieToken(user, res);
+
       } catch (error) {
         res.json({
           success: false,
@@ -57,42 +37,33 @@ exports.signup = async (req, res) => {
 
 exports.login = async (req, res) => {
     try {
+        //Take the data fromt the request body...
         const { email, password } = req.body;
-    
-        if (!(email && password)) {
-          throw new Error("Email and password must be provided!");
+        console.log(req.body)
+
+        //Handle the absence of the request body...
+        if (!email || !password) {
+            throw new Error("Email and Password are compulsory!");
         }
-      
-        const user = await User.findOne({ email });
-    
+
+        //Take out the user info from the database...
+        const user = await User.findOne({ email: email }).select("+password");
+
+        //Throw an error if the user does not exist in the database...
         if (!user) {
-          throw new Error("User did not exist! Please Register...")
+            throw new Error("User does not exist. Kindly Register or SignUp!");
         }
-    
-        if (!(bcrypt.compare(user.password, password))) {
-          throw new Error("Password mismatch! Please Enter valid password!");
+
+        //Check if the password matches...
+        const isPasswordCorrect = user.isValidPassword(password);
+
+        //If the password doesn't matches, then Throw an error...
+        if (!isPasswordCorrect) {
+            throw new Error("Password is incorrect.");
         }
-    
-        const token = jwt.sign(
-          { user_id: user._id, email },
-          process.env.SECRET_KEY,
-          {
-            expiresIn: "2h",
-          }
-        );
-    
-        user.password = undefined;
-    
-        const options = {
-          expires: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
-          httpOnly: true,
-        };
-    
-        res.status(200).cookie("token", token, options).json({
-          success: true,
-          token,
-          user,
-        });
+
+        //Generate the Cookie Token and Give them a good Response...
+        generateCookieToken(user, res);
     
     
       } catch (error) {
