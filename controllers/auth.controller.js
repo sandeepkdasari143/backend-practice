@@ -103,3 +103,22 @@ exports.login = async (req, res) => {
         })
       }
 }
+
+exports.getAllUsers = async (req, res) => {
+  try {
+    const users = await User.find();
+    if (!users) {
+      throw new Error("Users Not Found");
+    }
+    res.status(200).json({
+      success: true,
+      message:"All Registered Users are Fetched",
+      users
+    })
+  } catch (error) {
+    res.status(400).json({
+      error: true,
+      message: error.message
+    })
+  }
+}
