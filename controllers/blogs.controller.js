@@ -61,3 +61,22 @@ exports.createBlog = async (req, res) => {
         })
     }
 }
+
+exports.getAllBlogs = async (req, res) => {
+    try {
+        const blogs = await Blog.find();
+        if (!blogs) {
+            throw new Error("Blogs Not Found");
+        }
+        res.status(200).json({
+            success: true,
+            message:"All Registered Blogs are Fetched",
+            blogs
+        })
+        } catch (error) {
+        res.status(400).json({
+            error: true,
+            message: error.message
+        })
+    }
+}
